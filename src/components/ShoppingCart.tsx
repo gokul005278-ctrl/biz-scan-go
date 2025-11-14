@@ -34,9 +34,10 @@ interface ShoppingCartProps {
   couponCode?: string;
   additionalGstRate?: string;
   useIGST?: boolean;
-  billingMode?: string;  // "exclusive" or "inclusive"
-inclusiveBillType?: string;  // "split" or "mrp"
-
+  billingMode?: string;
+  inclusiveBillType?: string;
+  loyaltyPoints?: number;
+  customerPhone?: string;
 }
 
 const ShoppingCart = ({ 
@@ -53,7 +54,9 @@ const ShoppingCart = ({
   additionalGstRate,
   useIGST = false,
   billingMode = "exclusive",
-  inclusiveBillType = "split"
+  inclusiveBillType = "split",
+  loyaltyPoints = 0,
+  customerPhone,
 }: ShoppingCartProps) => {
   const subtotal = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
   //const productTaxAmount = useIGST ? productIGST : (productSGST + productCGST);
@@ -92,6 +95,16 @@ const ShoppingCart = ({
           </div>
         ) : (
           <>
+            {/* Loyalty Points Display */}
+            {customerPhone && loyaltyPoints > 0 && (
+              <div className="mb-4 p-3 bg-accent/10 border border-accent/20 rounded-lg">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium text-foreground">Loyalty Points Available</span>
+                  <span className="text-lg font-bold text-accent">{loyaltyPoints} pts</span>
+                </div>
+              </div>
+            )}
+            
             <div className="space-y-4 mb-4">
               {items.map((item) => (
                 <div key={item.id} className="flex items-center gap-4 p-3 bg-muted/50 rounded-lg">

@@ -103,7 +103,10 @@ const Analytics = () => {
         items.forEach((item: any) => {
           const product = productsList?.find(p => p.id === item.id);
           if (product && product.buying_price) {
-            const profit = (item.price - product.buying_price) * item.quantity;
+            // Use the base price stored in the cart item for profit calculation
+            // The item.price already reflects the correct base price regardless of billing mode
+            const basePrice = item.price;
+            const profit = (basePrice - product.buying_price) * item.quantity;
             totalProfit += profit;
           }
         });

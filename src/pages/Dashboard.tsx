@@ -95,14 +95,14 @@ const Dashboard = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-accent/5">
       <header className="border-b bg-card/80 backdrop-blur-sm sticky top-0 z-10">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
+        <div className="container mx-auto px-3 sm:px-4 py-3 sm:py-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <ShoppingCart className="h-6 w-6 text-primary" />
-            <h1 className="text-2xl font-bold">Eduvanca Billing</h1>
+            <ShoppingCart className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
+            <h1 className="text-lg sm:text-xl md:text-2xl font-bold">Eduvanca Billing</h1>
           </div>
-          <Button variant="outline" onClick={handleLogout}>
-            <LogOut className="mr-2 h-4 w-4" />
-            Logout
+          <Button variant="outline" size="sm" className="text-xs sm:text-sm" onClick={handleLogout}>
+            <LogOut className="mr-0 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
+            <span className="hidden sm:inline">Logout</span>
           </Button>
         </div>
       </header>
@@ -115,7 +115,7 @@ const Dashboard = () => {
           <p className="text-sm sm:text-base text-muted-foreground">Choose an option to get started</p>
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-6">
+        <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-6">
           {menuItems.map((item) => (
             <Card 
               key={item.path}
@@ -126,7 +126,7 @@ const Dashboard = () => {
                 <div className={`p-2 sm:p-3 bg-gradient-to-br ${item.color} bg-opacity-10 rounded-xl w-fit mb-2 group-hover:scale-110 transition-transform`}>
                   <item.icon className="h-5 w-5 sm:h-8 sm:w-8 text-white" />
                 </div>
-                <CardTitle className="text-sm sm:text-base md:text-lg">{item.label}</CardTitle>
+                <CardTitle className="text-sm sm:text-base md:text-lg leading-tight break-words-safe">{item.label}</CardTitle>
                 <CardDescription className="hidden sm:block text-xs sm:text-sm">
                   {item.label === "Manual Billing" && "Create bills by searching products"}
                   {item.label === "Modern Billing" && "Visual product grid with categories"}
