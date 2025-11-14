@@ -74,6 +74,7 @@ export type Database = {
       company_profiles: {
         Row: {
           address: string | null
+          billing_settings: Json | null
           city: string | null
           company_name: string
           created_at: string | null
@@ -86,10 +87,10 @@ export type Database = {
           thank_you_note: string | null
           updated_at: string | null
           user_id: string
-          billing_settings: Json | null
         }
         Insert: {
           address?: string | null
+          billing_settings?: Json | null
           city?: string | null
           company_name: string
           created_at?: string | null
@@ -102,10 +103,10 @@ export type Database = {
           thank_you_note?: string | null
           updated_at?: string | null
           user_id: string
-          billing_settings?: Json | null
         }
         Update: {
           address?: string | null
+          billing_settings?: Json | null
           city?: string | null
           company_name?: string
           created_at?: string | null
@@ -118,7 +119,6 @@ export type Database = {
           thank_you_note?: string | null
           updated_at?: string | null
           user_id?: string
-          billing_settings?: Json | null
         }
         Relationships: []
       }
