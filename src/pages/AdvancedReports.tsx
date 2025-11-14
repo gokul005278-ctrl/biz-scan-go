@@ -162,7 +162,10 @@ const AdvancedReports = () => {
         items.forEach((item: any) => {
           const product = products.find(p => p.id === item.id);
           if (product && product.buying_price) {
-            totalProfit += (item.price - product.buying_price) * item.quantity;
+            // Use base price stored in cart item for accurate profit calculation
+            // item.price already contains the correct base price for all billing modes
+            const basePrice = item.price;
+            totalProfit += (basePrice - product.buying_price) * item.quantity;
           }
         });
       });
@@ -196,10 +199,12 @@ const AdvancedReports = () => {
           if (product) {
             const existing = productMap.get(item.id) || { quantity: 0, revenue: 0, profit: 0, salesCount: 0, name: product.name };
             existing.quantity += item.quantity;
-            existing.revenue += item.price * item.quantity;
+            // Use base price for revenue calculation
+            const basePrice = item.price;
+            existing.revenue += basePrice * item.quantity;
             existing.salesCount += 1;
             if (product.buying_price) {
-              existing.profit += (item.price - product.buying_price) * item.quantity;
+              existing.profit += (basePrice - product.buying_price) * item.quantity;
             }
             productMap.set(item.id, existing);
           }

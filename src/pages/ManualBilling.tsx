@@ -706,13 +706,14 @@ const ManualBilling = () => {
       (billingSettings?.mode === "inclusive" && billingSettings?.inclusiveBillType === "split");
     
     doc.text("Item", leftMargin, currentY);
-    doc.text("Qty", 40, currentY);
-    doc.text("Rate", 55, currentY);
+    doc.text("Qty", 38, currentY);
     if (showTaxColumn) {
-      doc.text("Tax", 67, currentY);
-      doc.text("Amt", 78, currentY, { align: "right" });
+      doc.text("Rate", 50, currentY);
+      doc.text("Tax", 62, currentY);
+      doc.text("Amt", rightMargin, currentY, { align: "right" });
     } else {
-      doc.text("Amt", 78, currentY, { align: "right" });
+      doc.text("Rate", 52, currentY);
+      doc.text("Amt", rightMargin, currentY, { align: "right" });
     }
     
     currentY += 3;
@@ -756,12 +757,11 @@ const nameLines = wrapTextByWidth(doc, item.name, 32);
 
   const amount = item.price * item.quantity;
 
-  // FIXED COLUMN COORDINATES
-  // FINAL NON-OVERLAPPING COLUMN POSITIONS
-const colQty = 40;   // Qty column
-const colRate = 55;  // Rate column
-const colTax = 67;   // Tax column
-const colAmt = 78;   // Amount (always right)
+  // FIXED COLUMN COORDINATES FOR NON-OVERLAPPING DISPLAY
+const colQty = 38;   // Qty column
+const colRate = showTaxColumn ? 50 : 52;  // Rate column (adjust based on tax column)
+const colTax = 62;   // Tax column
+const colAmt = rightMargin;   // Amount (always right-aligned at edge)
 
 
   nameLines.forEach((line, index) => {
@@ -773,21 +773,14 @@ const colAmt = 78;   // Amount (always right)
 
   // FIRST LINE → Show Qty, Rate, Tax, Amt
   if (index === 0) {
-
-    // FIXED FINAL COLUMN POSITIONS
-    const colQty = 40;
-    const colRate = 55;
-    const colTax = 67;
-    const colAmt = 78;
-
     doc.text(qtyLabel, colQty, y);
-    doc.text(formatIndianNumber(item.price), colRate, y);
+    doc.text(formatIndianNumber(item.price, 2), colRate, y);
 
     if (showTaxColumn) {
-      doc.text(`${item.tax_rate.toFixed(1)}%`, colTax, y);
+      doc.text(`${item.tax_rate.toFixed(0)}%`, colTax, y);
     }
 
-    doc.text(formatIndianNumber(amount), colAmt, y, { align: "right" });
+    doc.text(formatIndianNumber(amount, 2), colAmt, y, { align: "right" });
   }
 
   currentY += index === 0 ? 4.5 : 4;
@@ -1019,7 +1012,8 @@ const colAmt = 78;   // Amount (always right)
     doc.text(`Name: ${customerName}`, 113, boxY + 14);
     doc.text(`Phone: ${customerPhone}`, 113, boxY + 20);
     if (loyaltyPoints > 0) {
-      doc.text(`Loyalty Points: ${loyaltyPoints}`, 113, boxY + 26);
+      doc.setFont(undefined, 'normal');
+      doc.text(`Loyalty Points: ${formatIndianNumber(loyaltyPoints, 0)}`, 113, boxY + 26);
     }
     
     currentY = boxY + 40;
@@ -1069,12 +1063,12 @@ const colAmt = 78;   // Amount (always right)
       
       doc.text(itemName, leftMargin + 2, currentY + 5.5);
       doc.text(qtyLabel, 100, currentY + 5.5, { align: "center" });
-      doc.text(`${item.price.toFixed(2)}`, 130, currentY + 5.5, { align: "center" });
+      doc.text(formatIndianNumber(item.price, 2), 130, currentY + 5.5, { align: "center" });
       if (showTaxColumn) {
-        doc.text(`${item.tax_rate.toFixed(1)}%`, 155, currentY + 5.5, { align: "center" });
-        doc.text(`${itemAmount.toFixed(2)}`, rightMargin - 2, currentY + 5.5, { align: "right" });
+        doc.text(`${item.tax_rate.toFixed(0)}%`, 155, currentY + 5.5, { align: "center" });
+        doc.text(formatIndianNumber(itemAmount, 2), rightMargin - 2, currentY + 5.5, { align: "right" });
       } else {
-        doc.text(`${itemAmount.toFixed(2)}`, rightMargin - 2, currentY + 5.5, { align: "right" });
+        doc.text(formatIndianNumber(itemAmount, 2), rightMargin - 2, currentY + 5.5, { align: "right" });
       }
       
       currentY += 8;
@@ -1237,8 +1231,8 @@ const colAmt = 78;   // Amount (always right)
       </header>
 
       <main className="container mx-auto px-2 sm:px-4 py-4 sm:py-8 overflow-x-hidden">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 max-w-full">
-          <div className="space-y-4">
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 sm:gap-6 max-w-full">
+          <div className="space-y-4 w-full">
             <Card>
               <CardHeader className="px-4 sm:px-6 py-4">
                 <CardTitle className="text-base sm:text-lg">Counter & Customer</CardTitle>
@@ -1448,7 +1442,7 @@ const colAmt = 78;   // Amount (always right)
             </Card>
           </div>
 
-          <div className="space-y-4">
+          <div className="space-y-4 w-full xl:sticky xl:top-20 xl:h-fit">
             <Card>
               <CardContent className="pt-6 space-y-4">
                 <div>
@@ -1497,6 +1491,8 @@ const colAmt = 78;   // Amount (always right)
               couponCode={selectedCoupon ? coupons.find(c => c.id === selectedCoupon)?.code : undefined}
               additionalGstAmount={calculateTotals().additionalTaxAmount}
               additionalGstRate={additionalGstRate}
+              loyaltyPoints={loyaltyPoints}
+              customerPhone={customerPhone}
             />
           </div>
         </div>

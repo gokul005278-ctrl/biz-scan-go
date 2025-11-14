@@ -128,4 +128,22 @@ All colors MUST be HSL.
     transform: translateY(-2px);
     box-shadow: 0 12px 24px -10px hsl(var(--primary) / 0.2);
   }
+  
+  /* Mobile optimizations */
+  @media (max-width: 768px) {
+    .container {
+      padding-left: 0.75rem;
+      padding-right: 0.75rem;
+    }
+  }
+  
+  /* Ensure proper text wrapping on mobile */
+  @layer utilities {
+    .break-words-safe {
+      overflow-wrap: break-word;
+      word-wrap: break-word;
+      word-break: break-word;
+      hyphens: auto;
+    }
+  }
 }
