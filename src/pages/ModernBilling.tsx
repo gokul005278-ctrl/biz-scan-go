@@ -697,23 +697,62 @@ if (billingSettings?.mode === "inclusive" && billingSettings?.inclusiveBillType 
     doc.setFont(undefined, 'bold');
     doc.setFontSize(7);
 
-    // Column anchors to avoid collision on thermal bills
+    // Column layout with fixed widths to prevent collision
     const isMrp = billingSettings?.mode === "inclusive" && billingSettings?.inclusiveBillType === "mrp";
-    const qtyX = isMrp ? 44 : 38;
-    const rateX = isMrp ? 60 : 56;
-    const taxX = 64;
-    const amtX = rightMargin - 2;
+    const tableWidth = rightMargin - leftMargin; // 70mm
+
+    // Define column widths that sum to table width
+    const itemW = isMrp ? 34 : 26;
+    const qtyW = 10;
+    const rateW = 12;
+    const taxW = isMrp ? 0 : 8;
+    const amtW = isMrp ? 14 : 14;
+
+    const xItemL = leftMargin;
+    const xItemR = xItemL + itemW;
+    const xQtyL = xItemR;
+    const xQtyR = xQtyL + qtyW;
+    const xRateL = xQtyR;
+    const xRateR = xRateL + rateW;
+    const xTaxL = xRateR;
+    const xTaxR = xTaxL + taxW;
+    const xAmtL = isMrp ? xRateR : xTaxR;
+    const xAmtR = rightMargin;
+
+    const qtyX = (xQtyL + xQtyR) / 2;
+    const rateRightX = xRateR - 0.5;
+    const taxRightX = isMrp ? undefined : xTaxR - 0.5;
+    const amtRightX = xAmtR - 0.5;
+
+    const fitToWidth = (text: string, maxW: number) => {
+      let t = text;
+      while (doc.getTextWidth(t) > maxW && t.length > 1) {
+        t = t.slice(0, -1);
+      }
+      if (t !== text && t.length > 1) t = t.slice(0, -1) + '…';
+      return t;
+    };
+
+    const fitNumber = (text: string, maxW: number) => {
+      let t = text;
+      if (doc.getTextWidth(t) <= maxW) return t;
+      if (t.includes('.')) {
+        t = t.split('.')[0];
+        if (doc.getTextWidth(t) <= maxW) return t;
+      }
+      t = t.replace(/,/g, '');
+      while (doc.getTextWidth(t) > maxW && t.length > 1) {
+        t = t.slice(0, -1);
+      }
+      return t;
+    };
 
     // Headers
-    doc.text("Item", leftMargin, currentY);
+    doc.text("Item", xItemL, currentY);
     doc.text("Qty", qtyX, currentY, { align: "center" });
-    if (isMrp) {
-      doc.text("MRP", rateX, currentY, { align: "right" });
-    } else {
-      doc.text("Rate", rateX, currentY, { align: "right" });
-      doc.text("Tax", taxX, currentY, { align: "right" });
-    }
-    doc.text("Amt", amtX, currentY, { align: "right" });
+    doc.text(isMrp ? "MRP" : "Rate", rateRightX, currentY, { align: "right" });
+    if (!isMrp) doc.text("Tax", taxRightX!, currentY, { align: "right" });
+    doc.text("Amt", amtRightX, currentY, { align: "right" });
 
     currentY += 3;
     doc.line(leftMargin, currentY, rightMargin, currentY);
@@ -721,22 +760,25 @@ if (billingSettings?.mode === "inclusive" && billingSettings?.inclusiveBillType 
     currentY += 4;
     doc.setFont(undefined, 'normal');
     cartItems.forEach(item => {
-      const itemName = item.name.length > 16 ? item.name.substring(0, 16) + '...' : item.name;
+      const itemName = fitToWidth(item.name, itemW - 1.5);
       const qtyLabel = item.price_type === 'weight' ? `${item.quantity.toFixed(2)}kg` : item.quantity.toString();
       const taxRate = item.tax_rate || item.igst || (item.cgst + item.sgst) || 0;
+      const rateStr = formatIndianNumber(item.price, 2);
+      const amtStr = formatIndianNumber(item.price * item.quantity, 2);
       
       // Item name (left aligned)
-      doc.text(itemName, leftMargin, currentY);
+      doc.text(itemName, xItemL, currentY);
       // Qty (center)
       doc.text(qtyLabel, qtyX, currentY, { align: 'center' });
       // Rate (right)
-      doc.text(formatIndianNumber(item.price, 2), rateX, currentY, { align: 'right' });
+      doc.text(fitNumber(rateStr, (xRateR - xRateL) - 1), rateRightX, currentY, { align: 'right' });
       // Tax (right) - only when not MRP
       if (!isMrp) {
-        doc.text(`${taxRate.toFixed(0)}%`, taxX, currentY, { align: 'right' });
+        const taxStr = `${taxRate.toFixed(0)}%`;
+        doc.text(fitNumber(taxStr, (xTaxR - xTaxL) - 1), taxRightX!, currentY, { align: 'right' });
       }
       // Amount (right)
-      doc.text(formatIndianNumber(item.price * item.quantity, 2), amtX, currentY, { align: 'right' });
+      doc.text(fitNumber(amtStr, (xAmtR - xAmtL) - 1), amtRightX, currentY, { align: 'right' });
 
       currentY += 4;
     });
