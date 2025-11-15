@@ -14,6 +14,7 @@ import { setCounterSession, getCounterSession } from "@/lib/counterSession";
 import { saveInvoiceToIndexedDB } from "@/lib/indexedDB";
 import jsPDF from "jspdf";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ShareDialog } from "@/components/ShareDialog";
 
 const ModernBilling = () => {
   const navigate = useNavigate();
@@ -37,6 +38,8 @@ const ModernBilling = () => {
   const [productQuantities, setProductQuantities] = useState<{ [key: string]: number }>({});
   //added by me
   const [billingSettings, setBillingSettings] = useState<any>(null);
+  const [showShareDialog, setShowShareDialog] = useState(false);
+  const [lastInvoiceData, setLastInvoiceData] = useState<{billNumber: string; total: number} | null>(null);
 
 
 
@@ -591,6 +594,10 @@ if (billingSettings?.mode === "inclusive" && billingSettings?.inclusiveBillType 
 
       toast.success("Sale completed successfully!");
       
+      // Show share dialog
+      setLastInvoiceData({ billNumber, total: totals.total });
+      setShowShareDialog(true);
+      
       // Reset form
       setCartItems([]);
       setCustomerName("");
@@ -689,18 +696,18 @@ if (billingSettings?.mode === "inclusive" && billingSettings?.inclusiveBillType 
     currentY += 5;
     doc.setFont(undefined, 'bold');
     doc.setFontSize(7);
-    if (billingSettings?.mode === "inclusive" &&
-    billingSettings?.inclusiveBillType === "split")
- {
+    if (billingSettings?.mode === "inclusive" && billingSettings?.inclusiveBillType === "mrp") {
+  // MRP mode - no tax column
   doc.text("Item", leftMargin, currentY);
-  doc.text("Qty", 40, currentY);
-  doc.text("Rate", 52, currentY);
-  doc.text("Tax", 63, currentY);
+  doc.text("Qty", 42, currentY);
+  doc.text("MRP", 56, currentY);
   doc.text("Amt", rightMargin, currentY, { align: "right" });
 } else {
+  // Exclusive or Inclusive-Split mode - show tax column
   doc.text("Item", leftMargin, currentY);
-  doc.text("Qty", 45, currentY);
-  doc.text("Rate", 55, currentY);
+  doc.text("Qty", 35, currentY);
+  doc.text("Rate", 48, currentY);
+  doc.text("Tax", 60, currentY);
   doc.text("Amt", rightMargin, currentY, { align: "right" });
 }
 
@@ -711,23 +718,24 @@ if (billingSettings?.mode === "inclusive" && billingSettings?.inclusiveBillType 
     currentY += 4;
     doc.setFont(undefined, 'normal');
     cartItems.forEach(item => {
-      const itemName = item.name.length > 18 ? item.name.substring(0, 18) + '...' : item.name;
-      const qtyLabel = item.price_type === 'weight' ? `${item.quantity.toFixed(3)}kg` : item.quantity.toString();
+      const itemName = item.name.length > 14 ? item.name.substring(0, 14) + '...' : item.name;
+      const qtyLabel = item.price_type === 'weight' ? `${item.quantity.toFixed(2)}kg` : item.quantity.toString();
+      const taxRate = item.tax_rate || item.igst || (item.cgst + item.sgst) || 0;
       
-      if (billingSettings?.mode === "inclusive" &&
-    billingSettings?.inclusiveBillType === "split") {
-  const taxRate = item.tax_rate || 0;
-  doc.text(itemName, leftMargin, currentY);
-  doc.text(qtyLabel, 40, currentY);
-  doc.text(formatIndianNumber(item.price), 52, currentY);
-  doc.text(`${taxRate.toFixed(1)}%`, 63, currentY);
-  doc.text(formatIndianNumber(item.price * item.quantity), rightMargin - 2, currentY, { align: "right" });
-} else {
-  doc.text(itemName, leftMargin, currentY);
-  doc.text(qtyLabel, 45, currentY);
-  doc.text(formatIndianNumber(item.price), 55, currentY);
-  doc.text(formatIndianNumber(item.price * item.quantity), rightMargin - 2, currentY, { align: "right" });
-}
+      if (billingSettings?.mode === "inclusive" && billingSettings?.inclusiveBillType === "mrp") {
+        // MRP mode - no tax column
+        doc.text(itemName, leftMargin, currentY);
+        doc.text(qtyLabel, 42, currentY);
+        doc.text(formatIndianNumber(item.price, 2), 56, currentY);
+        doc.text(formatIndianNumber(item.price * item.quantity, 2), rightMargin - 2, currentY, { align: "right" });
+      } else {
+        // Exclusive or Inclusive-Split - show tax
+        doc.text(itemName, leftMargin, currentY);
+        doc.text(qtyLabel, 35, currentY);
+        doc.text(formatIndianNumber(item.price, 2), 48, currentY);
+        doc.text(`${taxRate.toFixed(0)}%`, 60, currentY);
+        doc.text(formatIndianNumber(item.price * item.quantity, 2), rightMargin - 2, currentY, { align: "right" });
+      }
 
       currentY += 4;
     });
@@ -737,46 +745,44 @@ if (billingSettings?.mode === "inclusive" && billingSettings?.inclusiveBillType 
     
     doc.setFontSize(8);
     doc.text("Subtotal:", leftMargin, currentY);
-    doc.text(formatIndianNumber(subtotal), rightMargin - 2, currentY, { align: "right" });
+    doc.text(formatIndianNumber(subtotal, 2), rightMargin - 2, currentY, { align: "right" });
     currentY += 4;
     
-    // Show taxes based on trade type
-    if (billingSettings?.mode === "inclusive" &&
-    billingSettings?.inclusiveBillType === "split") {
-    if (intraStateTrade) {
-      if (productIGST > 0) {
-        doc.text("IGST:", leftMargin, currentY);
-        doc.text(formatIndianNumber(productIGST), rightMargin - 2, currentY, { align: "right" });
-        currentY += 4;
-      }
-    } else {
-      // Calculate SGST and CGST breakdown
-      const productSGST = cartItems.reduce((sum, item) => {
-        const itemTotal = item.price * item.quantity;
-        const sgstRate = item.sgst || 0;
-        return sum + (itemTotal * sgstRate / 100);
-      }, 0);
-      
-      
-      const productCGST = cartItems.reduce((sum, item) => {
-        const itemTotal = item.price * item.quantity;
-        const cgstRate = item.cgst || 0;
-        return sum + (itemTotal * cgstRate / 100);
-      }, 0);
-      
-      if (productSGST > 0) {
-        doc.text("SGST:", leftMargin, currentY);
-        doc.text(formatIndianNumber(productSGST), rightMargin - 2, currentY, { align: "right" });
-        currentY += 4;
-      }
-      
-      if (productCGST > 0) {
-        doc.text("CGST:", leftMargin, currentY);
-        doc.text(formatIndianNumber(productCGST), rightMargin - 2, currentY, { align: "right" });
-        currentY += 4;
+    // Show taxes for all modes except MRP
+    if (!(billingSettings?.mode === "inclusive" && billingSettings?.inclusiveBillType === "mrp")) {
+      if (intraStateTrade) {
+        if (productIGST > 0) {
+          doc.text("IGST:", leftMargin, currentY);
+          doc.text(formatIndianNumber(productIGST, 2), rightMargin - 2, currentY, { align: "right" });
+          currentY += 4;
+        }
+      } else {
+        // Calculate SGST and CGST breakdown
+        const productSGST = cartItems.reduce((sum, item) => {
+          const itemTotal = item.price * item.quantity;
+          const sgstRate = item.sgst || 0;
+          return sum + (itemTotal * sgstRate / 100);
+        }, 0);
+        
+        const productCGST = cartItems.reduce((sum, item) => {
+          const itemTotal = item.price * item.quantity;
+          const cgstRate = item.cgst || 0;
+          return sum + (itemTotal * cgstRate / 100);
+        }, 0);
+        
+        if (productSGST > 0) {
+          doc.text("SGST:", leftMargin, currentY);
+          doc.text(formatIndianNumber(productSGST, 2), rightMargin - 2, currentY, { align: "right" });
+          currentY += 4;
+        }
+        
+        if (productCGST > 0) {
+          doc.text("CGST:", leftMargin, currentY);
+          doc.text(formatIndianNumber(productCGST, 2), rightMargin - 2, currentY, { align: "right" });
+          currentY += 4;
+        }
       }
     }
-  }
     if (couponDiscount > 0) {
       const coupon = coupons.find(c => c.id === selectedCoupon);
       doc.text(`Coupon (${coupon?.code}):`, leftMargin, currentY);
@@ -969,19 +975,20 @@ doc.text(gstNote, centerX, currentY, { align: "center" });
     doc.setTextColor(255, 255, 255);
     doc.setFont(undefined, 'bold');
     doc.setFontSize(9);
-    if (billingSettings?.mode === "inclusive" &&
-    billingSettings?.inclusiveBillType === "split"){
-  doc.text("Item", leftMargin + 2, currentY + 6);
-  doc.text("Qty", 100, currentY + 6, { align: "center" });
-  doc.text("Rate", 130, currentY + 6, { align: "center" });
-  doc.text("Tax", 155, currentY + 6, { align: "center" });
-  doc.text("Amount", rightMargin - 2, currentY + 6, { align: "right" });
-} else {
-  doc.text("Item", leftMargin + 2, currentY + 6);
-  doc.text("Qty", 110, currentY + 6, { align: "center" });
-  doc.text("Rate", 150, currentY + 6, { align: "center" });
-  doc.text("Amount", rightMargin - 2, currentY + 6, { align: "right" });
-}
+    if (billingSettings?.mode === "inclusive" && billingSettings?.inclusiveBillType === "mrp") {
+      // MRP mode - no tax column
+      doc.text("Item", leftMargin + 2, currentY + 6);
+      doc.text("Qty", 115, currentY + 6, { align: "center" });
+      doc.text("MRP", 145, currentY + 6, { align: "center" });
+      doc.text("Amount", rightMargin - 2, currentY + 6, { align: "right" });
+    } else {
+      // Exclusive or Inclusive-Split - show tax column
+      doc.text("Item", leftMargin + 2, currentY + 6);
+      doc.text("Qty", 105, currentY + 6, { align: "center" });
+      doc.text("Rate", 135, currentY + 6, { align: "center" });
+      doc.text("Tax", 160, currentY + 6, { align: "center" });
+      doc.text("Amount", rightMargin - 2, currentY + 6, { align: "right" });
+    }
 
     
     currentY += 10;
@@ -1004,24 +1011,25 @@ doc.text(gstNote, centerX, currentY, { align: "center" });
       doc.setLineWidth(0.1);
       doc.line(leftMargin, currentY, rightMargin, currentY);
       
-      const itemName = item.name.length > 30 ? item.name.substring(0, 30) + '...' : item.name;
-      const qtyLabel = item.price_type === 'weight' ? `${item.quantity.toFixed(3)} kg` : `${item.quantity}`;
+      const itemName = item.name.length > 35 ? item.name.substring(0, 35) + '...' : item.name;
+      const qtyLabel = item.price_type === 'weight' ? `${item.quantity.toFixed(2)} kg` : `${item.quantity}`;
       const itemAmount = item.price * item.quantity;
       const taxRate = item.tax_rate || item.igst || (item.cgst + item.sgst) || 0;
       
-      if (billingSettings?.mode === "inclusive" &&
-    billingSettings?.inclusiveBillType === "split"){
-  doc.text(itemName, leftMargin + 2, currentY + 5.5);
-  doc.text(qtyLabel, 100, currentY + 5.5, { align: "center" });
-  doc.text(`₹${item.price.toFixed(2)}`, 130, currentY + 5.5, { align: "center" });
-  doc.text(`${taxRate.toFixed(1)}%`, 155, currentY + 5.5, { align: "center" });
-  doc.text(`₹${itemAmount.toFixed(2)}`, rightMargin - 2, currentY + 5.5, { align: "right" });
-} else {
-  doc.text(itemName, leftMargin + 2, currentY + 5.5);
-  doc.text(qtyLabel, 120, currentY + 5.5, { align: "center" });
-  doc.text(`₹${item.price.toFixed(2)}`, 160, currentY + 5.5, { align: "center" });
-  doc.text(`₹${itemAmount.toFixed(2)}`, rightMargin - 2, currentY + 5.5, { align: "right" });
-}
+      if (billingSettings?.mode === "inclusive" && billingSettings?.inclusiveBillType === "mrp") {
+        // MRP mode - no tax column
+        doc.text(itemName, leftMargin + 2, currentY + 5.5);
+        doc.text(qtyLabel, 115, currentY + 5.5, { align: "center" });
+        doc.text(`₹${formatIndianNumber(item.price, 2)}`, 145, currentY + 5.5, { align: "center" });
+        doc.text(`₹${formatIndianNumber(itemAmount, 2)}`, rightMargin - 2, currentY + 5.5, { align: "right" });
+      } else {
+        // Exclusive or Inclusive-Split - show tax
+        doc.text(itemName, leftMargin + 2, currentY + 5.5);
+        doc.text(qtyLabel, 105, currentY + 5.5, { align: "center" });
+        doc.text(`₹${formatIndianNumber(item.price, 2)}`, 135, currentY + 5.5, { align: "center" });
+        doc.text(`${taxRate.toFixed(0)}%`, 160, currentY + 5.5, { align: "center" });
+        doc.text(`₹${formatIndianNumber(itemAmount, 2)}`, rightMargin - 2, currentY + 5.5, { align: "right" });
+      }
 
       
       currentY += 8;
@@ -1503,6 +1511,14 @@ doc.text(gstNote, centerX, currentY, { align: "center" });
           </div>
         </div>
       </div>
+      
+      <ShareDialog
+        open={showShareDialog}
+        onOpenChange={setShowShareDialog}
+        billNumber={lastInvoiceData?.billNumber || ""}
+        customerPhone={customerPhone}
+        total={lastInvoiceData?.total || 0}
+      />
     </div>
   );
 };
