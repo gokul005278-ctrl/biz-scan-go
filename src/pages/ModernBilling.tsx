@@ -696,46 +696,47 @@ if (billingSettings?.mode === "inclusive" && billingSettings?.inclusiveBillType 
     currentY += 5;
     doc.setFont(undefined, 'bold');
     doc.setFontSize(7);
-    if (billingSettings?.mode === "inclusive" && billingSettings?.inclusiveBillType === "mrp") {
-  // MRP mode - no tax column
-  doc.text("Item", leftMargin, currentY);
-  doc.text("Qty", 42, currentY);
-  doc.text("MRP", 56, currentY);
-  doc.text("Amt", rightMargin, currentY, { align: "right" });
-} else {
-  // Exclusive or Inclusive-Split mode - show tax column
-  doc.text("Item", leftMargin, currentY);
-  doc.text("Qty", 35, currentY);
-  doc.text("Rate", 48, currentY);
-  doc.text("Tax", 60, currentY);
-  doc.text("Amt", rightMargin, currentY, { align: "right" });
-}
 
-    
+    // Column anchors to avoid collision on thermal bills
+    const isMrp = billingSettings?.mode === "inclusive" && billingSettings?.inclusiveBillType === "mrp";
+    const qtyX = isMrp ? 44 : 38;
+    const rateX = isMrp ? 60 : 56;
+    const taxX = 64;
+    const amtX = rightMargin - 2;
+
+    // Headers
+    doc.text("Item", leftMargin, currentY);
+    doc.text("Qty", qtyX, currentY, { align: "center" });
+    if (isMrp) {
+      doc.text("MRP", rateX, currentY, { align: "right" });
+    } else {
+      doc.text("Rate", rateX, currentY, { align: "right" });
+      doc.text("Tax", taxX, currentY, { align: "right" });
+    }
+    doc.text("Amt", amtX, currentY, { align: "right" });
+
     currentY += 3;
     doc.line(leftMargin, currentY, rightMargin, currentY);
     
     currentY += 4;
     doc.setFont(undefined, 'normal');
     cartItems.forEach(item => {
-      const itemName = item.name.length > 14 ? item.name.substring(0, 14) + '...' : item.name;
+      const itemName = item.name.length > 16 ? item.name.substring(0, 16) + '...' : item.name;
       const qtyLabel = item.price_type === 'weight' ? `${item.quantity.toFixed(2)}kg` : item.quantity.toString();
       const taxRate = item.tax_rate || item.igst || (item.cgst + item.sgst) || 0;
       
-      if (billingSettings?.mode === "inclusive" && billingSettings?.inclusiveBillType === "mrp") {
-        // MRP mode - no tax column
-        doc.text(itemName, leftMargin, currentY);
-        doc.text(qtyLabel, 42, currentY);
-        doc.text(formatIndianNumber(item.price, 2), 56, currentY);
-        doc.text(formatIndianNumber(item.price * item.quantity, 2), rightMargin - 2, currentY, { align: "right" });
-      } else {
-        // Exclusive or Inclusive-Split - show tax
-        doc.text(itemName, leftMargin, currentY);
-        doc.text(qtyLabel, 35, currentY);
-        doc.text(formatIndianNumber(item.price, 2), 48, currentY);
-        doc.text(`${taxRate.toFixed(0)}%`, 60, currentY);
-        doc.text(formatIndianNumber(item.price * item.quantity, 2), rightMargin - 2, currentY, { align: "right" });
+      // Item name (left aligned)
+      doc.text(itemName, leftMargin, currentY);
+      // Qty (center)
+      doc.text(qtyLabel, qtyX, currentY, { align: 'center' });
+      // Rate (right)
+      doc.text(formatIndianNumber(item.price, 2), rateX, currentY, { align: 'right' });
+      // Tax (right) - only when not MRP
+      if (!isMrp) {
+        doc.text(`${taxRate.toFixed(0)}%`, taxX, currentY, { align: 'right' });
       }
+      // Amount (right)
+      doc.text(formatIndianNumber(item.price * item.quantity, 2), amtX, currentY, { align: 'right' });
 
       currentY += 4;
     });
@@ -751,34 +752,32 @@ if (billingSettings?.mode === "inclusive" && billingSettings?.inclusiveBillType 
     // Show taxes for all modes except MRP
     if (!(billingSettings?.mode === "inclusive" && billingSettings?.inclusiveBillType === "mrp")) {
       if (intraStateTrade) {
-        if (productIGST > 0) {
-          doc.text("IGST:", leftMargin, currentY);
-          doc.text(formatIndianNumber(productIGST, 2), rightMargin - 2, currentY, { align: "right" });
-          currentY += 4;
-        }
-      } else {
-        // Calculate SGST and CGST breakdown
+        // Intra-state: SGST + CGST
         const productSGST = cartItems.reduce((sum, item) => {
           const itemTotal = item.price * item.quantity;
           const sgstRate = item.sgst || 0;
           return sum + (itemTotal * sgstRate / 100);
         }, 0);
-        
         const productCGST = cartItems.reduce((sum, item) => {
           const itemTotal = item.price * item.quantity;
           const cgstRate = item.cgst || 0;
           return sum + (itemTotal * cgstRate / 100);
         }, 0);
-        
         if (productSGST > 0) {
           doc.text("SGST:", leftMargin, currentY);
           doc.text(formatIndianNumber(productSGST, 2), rightMargin - 2, currentY, { align: "right" });
           currentY += 4;
         }
-        
         if (productCGST > 0) {
           doc.text("CGST:", leftMargin, currentY);
           doc.text(formatIndianNumber(productCGST, 2), rightMargin - 2, currentY, { align: "right" });
+          currentY += 4;
+        }
+      } else {
+        // Inter-state: IGST
+        if (productIGST > 0) {
+          doc.text("IGST:", leftMargin, currentY);
+          doc.text(formatIndianNumber(productIGST, 2), rightMargin - 2, currentY, { align: "right" });
           currentY += 4;
         }
       }
