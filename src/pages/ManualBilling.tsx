@@ -632,7 +632,7 @@ const ManualBilling = () => {
   ) => {
     const doc = new jsPDF({
       unit: 'mm',
-      format: [80, Math.max(requiredHeight, 120)] // Minimum 120mm to prevent cutting
+      format: [80, Math.max(requiredHeight, 120)]
     });
     
     const pageWidth = 80;
@@ -702,93 +702,87 @@ const ManualBilling = () => {
     currentY += 5;
     doc.setFont(undefined, 'bold');
     doc.setFontSize(7);
-    const showTaxColumn = billingSettings?.mode === "exclusive" ||
-      (billingSettings?.mode === "inclusive" && billingSettings?.inclusiveBillType === "split");
     
-    doc.text("Item", leftMargin, currentY);
-    doc.text("Qty", 38, currentY);
-    if (showTaxColumn) {
-      doc.text("Rate", 50, currentY);
-      doc.text("Tax", 62, currentY);
-      doc.text("Amt", rightMargin, currentY, { align: "right" });
-    } else {
-      doc.text("Rate", 52, currentY);
-      doc.text("Amt", rightMargin, currentY, { align: "right" });
-    }
+    const isMrp = billingSettings?.mode === "inclusive" && billingSettings?.inclusiveBillType === "mrp";
     
+    // Column layout with fixed widths to prevent collision
+    const tableWidth = rightMargin - leftMargin;
+    const itemW = isMrp ? 34 : 26;
+    const qtyW = 10;
+    const rateW = 12;
+    const taxW = isMrp ? 0 : 8;
+    const amtW = isMrp ? 14 : 14;
+
+    const xItemL = leftMargin;
+    const xItemR = xItemL + itemW;
+    const xQtyL = xItemR;
+    const xQtyR = xQtyL + qtyW;
+    const xRateL = xQtyR;
+    const xRateR = xRateL + rateW;
+    const xTaxL = xRateR;
+    const xTaxR = xTaxL + taxW;
+    const xAmtL = isMrp ? xRateR : xTaxR;
+    const xAmtR = rightMargin;
+
+    const qtyX = (xQtyL + xQtyR) / 2;
+    const rateRightX = xRateR - 0.5;
+    const taxRightX = isMrp ? undefined : xTaxR - 0.5;
+    const amtRightX = xAmtR - 0.5;
+
+    const fitToWidth = (text: string, maxW: number) => {
+      let t = text;
+      while (doc.getTextWidth(t) > maxW && t.length > 1) {
+        t = t.slice(0, -1);
+      }
+      if (t !== text && t.length > 1) t = t.slice(0, -1) + '…';
+      return t;
+    };
+
+    const fitNumber = (text: string, maxW: number) => {
+      let t = text;
+      if (doc.getTextWidth(t) <= maxW) return t;
+      if (t.includes('.')) {
+        t = t.split('.')[0];
+        if (doc.getTextWidth(t) <= maxW) return t;
+      }
+      t = t.replace(/,/g, '');
+      while (doc.getTextWidth(t) > maxW && t.length > 1) {
+        t = t.slice(0, -1);
+      }
+      return t;
+    };
+
+    // Headers
+    doc.text("Item", xItemL, currentY);
+    doc.text("Qty", qtyX, currentY, { align: "center" });
+    doc.text(isMrp ? "MRP" : "Rate", rateRightX, currentY, { align: "right" });
+    if (!isMrp) doc.text("Tax", taxRightX!, currentY, { align: "right" });
+    doc.text("Amt", amtRightX, currentY, { align: "right" });
+
     currentY += 3;
     doc.line(leftMargin, currentY, rightMargin, currentY);
     
     currentY += 4;
     doc.setFont(undefined, 'normal');
-    // Wrap text by actual width (mm)
-function wrapTextByWidth(doc: any, text: string, maxWidth: number) {
-  const words = text.split(" ");
-  const lines: string[] = [];
-  let currentLine = "";
-
-  words.forEach(word => {
-    const testLine = currentLine ? currentLine + " " + word : word;
-    const width = doc.getTextWidth(testLine);
-
-    if (width > maxWidth) {
-      lines.push(currentLine);
-      currentLine = word;
-    } else {
-      currentLine = testLine;
-    }
-  });
-
-  if (currentLine) lines.push(currentLine);
-  return lines;
-}
-
+    
     cartItems.forEach(item => {
-  // Wrap item name (max 24 chars per line)
-  // Wrap item name safely (max width = 32mm)
-const nameLines = wrapTextByWidth(doc, item.name, 32);
+      const itemName = fitToWidth(item.name, itemW - 1.5);
+      const qtyLabel = item.price_type === 'weight' ? `${item.quantity.toFixed(2)}kg` : item.quantity.toString();
+      const taxRate = item.tax_rate || 0;
+      const rateStr = formatIndianNumber(item.price, 2);
+      const amtStr = formatIndianNumber(item.price * item.quantity, 2);
+      
+      doc.text(itemName, xItemL, currentY);
+      doc.text(qtyLabel, qtyX, currentY, { align: 'center' });
+      doc.text(fitNumber(rateStr, (xRateR - xRateL) - 1), rateRightX, currentY, { align: 'right' });
+      if (!isMrp) {
+        const taxStr = `${taxRate.toFixed(0)}%`;
+        doc.text(fitNumber(taxStr, (xTaxR - xTaxL) - 1), taxRightX!, currentY, { align: 'right' });
+      }
+      doc.text(fitNumber(amtStr, (xAmtR - xAmtL) - 1), amtRightX, currentY, { align: 'right' });
 
-
-  // Qty label
-  const qtyLabel =
-    item.price_type === "weight"
-      ? `${item.quantity.toFixed(3)}kg`
-      : item.quantity.toString();
-
-  const amount = item.price * item.quantity;
-
-  // FIXED COLUMN COORDINATES FOR NON-OVERLAPPING DISPLAY
-const colQty = 38;   // Qty column
-const colRate = showTaxColumn ? 50 : 52;  // Rate column (adjust based on tax column)
-const colTax = 62;   // Tax column
-const colAmt = rightMargin;   // Amount (always right-aligned at edge)
-
-
-  nameLines.forEach((line, index) => {
-  const y = currentY;
-  const indent = index === 0 ? 0 : 4;
-
-  // TEXT LINE
-  doc.text(line, leftMargin + indent, y);
-
-  // FIRST LINE → Show Qty, Rate, Tax, Amt
-  if (index === 0) {
-    doc.text(qtyLabel, colQty, y);
-    doc.text(formatIndianNumber(item.price, 2), colRate, y);
-
-    if (showTaxColumn) {
-      doc.text(`${item.tax_rate.toFixed(0)}%`, colTax, y);
-    }
-
-    doc.text(formatIndianNumber(amount, 2), colAmt, y, { align: "right" });
-  }
-
-  currentY += index === 0 ? 4.5 : 4;
-});
-
-
-  currentY += 1; // small gap between products
-});
+      currentY += 4;
+    });
 
 
     
@@ -797,32 +791,25 @@ const colAmt = rightMargin;   // Amount (always right-aligned at edge)
     
     doc.setFontSize(8);
     doc.text("Subtotal:", leftMargin, currentY);
-    doc.text(formatIndianNumber(subtotal), rightMargin - 2, currentY, { align: "right" });
+    doc.text(formatIndianNumber(subtotal, 2), rightMargin - 2, currentY, { align: "right" });
     currentY += 4;
     
-    // Show taxes based on billing mode
-    // TAX DISPLAY RULE:
-    // Exclusive: Show GST
-    // Inclusive + Split: Show GST
-    // Inclusive + MRP: No GST shown
-    const showTax = billingSettings?.mode === "exclusive" ||
-      (billingSettings?.mode === "inclusive" && billingSettings?.inclusiveBillType === "split");
-
-    if (showTax) {
+    // Always show taxes for Exclusive and Inclusive (Split) modes
+    if (!(billingSettings?.mode === "inclusive" && billingSettings?.inclusiveBillType === "mrp")) {
       if (intraStateTrade && productIGST > 0) {
         doc.text("IGST:", leftMargin, currentY);
-        doc.text(formatIndianNumber(productIGST), rightMargin - 2, currentY, { align: "right" });
+        doc.text(formatIndianNumber(productIGST, 2), rightMargin - 2, currentY, { align: "right" });
         currentY += 4;
       } else if (!intraStateTrade) {
         if (productSGST > 0) {
           doc.text("SGST:", leftMargin, currentY);
-          doc.text(formatIndianNumber(productSGST), rightMargin - 2, currentY, { align: "right" });
+          doc.text(formatIndianNumber(productSGST, 2), rightMargin - 2, currentY, { align: "right" });
           currentY += 4;
         }
         
         if (productCGST > 0) {
           doc.text("CGST:", leftMargin, currentY);
-          doc.text(formatIndianNumber(productCGST), rightMargin - 2, currentY, { align: "right" });
+          doc.text(formatIndianNumber(productCGST, 2), rightMargin - 2, currentY, { align: "right" });
           currentY += 4;
         }
       }
@@ -831,16 +818,16 @@ const colAmt = rightMargin;   // Amount (always right-aligned at edge)
     if (couponDiscount > 0) {
       const coupon = coupons.find(c => c.id === selectedCoupon);
       doc.text(`Coupon (${coupon?.code}):`, leftMargin, currentY);
-      doc.text(`-${formatIndianNumber(couponDiscount)}`, rightMargin - 2, currentY, { align: "right" });
+      doc.text(`-${formatIndianNumber(couponDiscount, 2)}`, rightMargin - 2, currentY, { align: "right" });
       currentY += 4;
     }
     
-    if (showTax && additionalGstAmount > 0 && !intraStateTrade) {
+    if (additionalGstAmount > 0 && !intraStateTrade) {
       doc.text("Add. SGST:", leftMargin, currentY);
-      doc.text(formatIndianNumber(additionalSGST), rightMargin - 2, currentY, { align: "right" });
+      doc.text(formatIndianNumber(additionalSGST, 2), rightMargin - 2, currentY, { align: "right" });
       currentY += 4;
       doc.text("Add. CGST:", leftMargin, currentY);
-      doc.text(formatIndianNumber(additionalCGST), rightMargin - 2, currentY, { align: "right" });
+      doc.text(formatIndianNumber(additionalCGST, 2), rightMargin - 2, currentY, { align: "right" });
       currentY += 4;
     }
     

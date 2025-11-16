@@ -5,10 +5,12 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft, Printer, Search } from "lucide-react";
+import { ArrowLeft, Printer, Search, Upload } from "lucide-react";
 import { toast } from "sonner";
 import JsBarcode from "jsbarcode";
 import QRCode from "qrcode";
+import { BrowserMultiFormatReader } from "@zxing/library";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface Product {
   id: string;
@@ -24,8 +26,11 @@ const Barcodes = () => {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [codeType, setCodeType] = useState<"barcode" | "qrcode">("barcode");
+  const [showUploadDialog, setShowUploadDialog] = useState(false);
+  const [selectedProductForUpload, setSelectedProductForUpload] = useState<string>("");
   const barcodeRef = useRef<HTMLCanvasElement>(null);
   const qrcodeRef = useRef<HTMLCanvasElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     fetchProducts();
@@ -81,6 +86,44 @@ const Barcodes = () => {
     } catch (error) {
       console.error(error);
       toast.error("Error generating code");
+    }
+  };
+
+  const handleBarcodeUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !selectedProductForUpload) {
+      toast.error("Please select a product and image");
+      return;
+    }
+
+    try {
+      const codeReader = new BrowserMultiFormatReader();
+      const imageUrl = URL.createObjectURL(file);
+      const result = await codeReader.decodeFromImageUrl(imageUrl);
+      
+      if (result) {
+        const decodedBarcode = result.getText();
+        
+        // Update product with new barcode
+        const { error } = await supabase
+          .from('products')
+          .update({ barcode: decodedBarcode })
+          .eq('id', selectedProductForUpload);
+
+        if (error) throw error;
+        
+        toast.success(`Barcode ${decodedBarcode} assigned successfully!`);
+        setShowUploadDialog(false);
+        setSelectedProductForUpload("");
+        fetchProducts();
+      } else {
+        toast.error("No barcode found in image");
+      }
+      
+      URL.revokeObjectURL(imageUrl);
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to decode barcode from image");
     }
   };
 
@@ -209,6 +252,47 @@ const Barcodes = () => {
       </header>
 
       <main className="container mx-auto px-2 sm:px-4 py-4 sm:py-8 overflow-x-hidden">
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Upload className="h-5 w-5" />
+              Upload Barcode Image
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div>
+                <Label>Select Product</Label>
+                <Select value={selectedProductForUpload} onValueChange={setSelectedProductForUpload}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Choose a product" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {products.map((product) => (
+                      <SelectItem key={product.id} value={product.id}>
+                        {product.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Upload Barcode Image</Label>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleBarcodeUpload}
+                  className="block w-full text-sm text-muted-foreground file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-primary-foreground hover:file:bg-primary/90 mt-2"
+                />
+                <p className="text-xs text-muted-foreground mt-2">
+                  Upload an image containing a barcode to decode and assign it to the selected product
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <Card>
             <CardHeader>

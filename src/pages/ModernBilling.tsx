@@ -1061,15 +1061,15 @@ doc.text(gstNote, centerX, currentY, { align: "center" });
         // MRP mode - no tax column
         doc.text(itemName, leftMargin + 2, currentY + 5.5);
         doc.text(qtyLabel, 115, currentY + 5.5, { align: "center" });
-        doc.text(`₹${formatIndianNumber(item.price, 2)}`, 145, currentY + 5.5, { align: "center" });
-        doc.text(`₹${formatIndianNumber(itemAmount, 2)}`, rightMargin - 2, currentY + 5.5, { align: "right" });
+        doc.text(`Rs.${formatIndianNumber(item.price, 2)}`, 145, currentY + 5.5, { align: "center" });
+        doc.text(`Rs.${formatIndianNumber(itemAmount, 2)}`, rightMargin - 2, currentY + 5.5, { align: "right" });
       } else {
         // Exclusive or Inclusive-Split - show tax
         doc.text(itemName, leftMargin + 2, currentY + 5.5);
         doc.text(qtyLabel, 105, currentY + 5.5, { align: "center" });
-        doc.text(`₹${formatIndianNumber(item.price, 2)}`, 135, currentY + 5.5, { align: "center" });
+        doc.text(`Rs.${formatIndianNumber(item.price, 2)}`, 135, currentY + 5.5, { align: "center" });
         doc.text(`${taxRate.toFixed(0)}%`, 160, currentY + 5.5, { align: "center" });
-        doc.text(`₹${formatIndianNumber(itemAmount, 2)}`, rightMargin - 2, currentY + 5.5, { align: "right" });
+        doc.text(`Rs.${formatIndianNumber(itemAmount, 2)}`, rightMargin - 2, currentY + 5.5, { align: "right" });
       }
 
       
@@ -1146,7 +1146,7 @@ doc.text(gstNote, centerX, currentY, { align: "center" });
       currentY += 6;
     }
     
-    if (taxAmount > 0) {
+    if (taxAmount > 0 && !(billingSettings?.mode === "inclusive" && billingSettings?.inclusiveBillType === "mrp")) {
       doc.setDrawColor(180, 180, 180);
       doc.setLineWidth(0.3);
       doc.line(totalsStartX, currentY, rightMargin - 2, currentY);
@@ -1276,6 +1276,10 @@ doc.text(gstNote, centerX, currentY, { align: "center" });
                     const discountPercentage = discount ? Number(discount.discount_percentage) : 0;
                     const originalPrice = Number(product.price);
                     const discountedPrice = originalPrice * (1 - discountPercentage / 100);
+                    
+                    const cartItem = cartItems.find(item => item.id === product.id);
+                    const inCart = !!cartItem;
+                    const cartQty = cartItem?.quantity || 0;
 
                     return (
                       <Card
@@ -1339,9 +1343,9 @@ doc.text(gstNote, centerX, currentY, { align: "center" });
                             <Button
                               size="sm"
                               onClick={() => handleAddToCart(product, productQuantities[product.id] || 1)}
-                              className="flex-shrink-0 h-7 sm:h-9 text-xs px-2 sm:px-4"
+                              className={`flex-shrink-0 h-7 sm:h-9 text-xs px-2 sm:px-4 ${inCart ? 'bg-yellow-500 hover:bg-yellow-600 text-white' : ''}`}
                             >
-                              Add
+                              {inCart ? `Added: ${cartQty}` : 'Add'}
                             </Button>
                           </div>
                         </CardContent>
