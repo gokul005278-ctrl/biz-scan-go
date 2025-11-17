@@ -33,12 +33,12 @@ export const ShareDialog = ({
     onOpenChange(false);
   };
 
-  const handleEmail = () => {
+  const handleGmail = () => {
     const subject = encodeURIComponent(`Invoice ${billNumber}`);
     const body = encodeURIComponent(
       `Dear Customer,\n\nPlease find your invoice details below:\n\nInvoice Number: ${billNumber}\nTotal Amount: ₹${total.toFixed(2)}\n\nThank you for your business!`
     );
-    window.location.href = `mailto:?subject=${subject}&body=${body}`;
+    window.open(`https://mail.google.com/mail/?view=cm&fs=1&su=${subject}&body=${body}`, '_blank');
     onOpenChange(false);
   };
 
@@ -65,13 +65,13 @@ export const ShareDialog = ({
           </Button>
           
           <Button
-            onClick={handleEmail}
+            onClick={handleGmail}
             className="w-full justify-start gap-3"
             variant="outline"
             size="lg"
           >
             <Mail className="h-5 w-5 text-blue-600" />
-            <span>Share via Email</span>
+            <span>Share via Gmail</span>
           </Button>
           
           <Button
