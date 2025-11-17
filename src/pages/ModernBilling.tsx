@@ -24,6 +24,7 @@ const ModernBilling = () => {
   const [products, setProducts] = useState<any[]>([]);
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
+  const [isNewCustomer, setIsNewCustomer] = useState(false);
   const [companyProfile, setCompanyProfile] = useState<any>(null);
   const [counters, setCounters] = useState<any[]>([]);
   const [selectedCounter, setSelectedCounter] = useState<string>("");
@@ -211,11 +212,12 @@ const ModernBilling = () => {
     }
   };
 
-  // Fetch loyalty points when customer phone changes
+  // Fetch loyalty points and customer details when customer phone changes
   useEffect(() => {
-    const fetchLoyaltyPoints = async () => {
+    const fetchCustomerDetails = async () => {
       if (!customerPhone || customerPhone.length < 10) {
         setLoyaltyPoints(0);
+        setIsNewCustomer(false);
         return;
       }
 
@@ -223,22 +225,50 @@ const ModernBilling = () => {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
 
-        const { data, error } = await supabase
+        // Fetch loyalty points
+        const { data: loyaltyData, error: loyaltyError } = await supabase
           .from('loyalty_points')
-          .select('points')
+          .select('points, customer_name')
           .eq('customer_phone', customerPhone)
           .eq('created_by', user.id)
           .maybeSingle();
 
-        if (error) throw error;
-        setLoyaltyPoints(data?.points || 0);
+        if (loyaltyError) throw loyaltyError;
+
+        if (loyaltyData) {
+          setLoyaltyPoints(loyaltyData.points || 0);
+          if (loyaltyData.customer_name && !customerName) {
+            setCustomerName(loyaltyData.customer_name);
+          }
+          setIsNewCustomer(false);
+        } else {
+          // Check if customer exists without loyalty points
+          const { data: customerData } = await supabase
+            .from('customers')
+            .select('name')
+            .eq('phone', customerPhone)
+            .eq('created_by', user.id)
+            .maybeSingle();
+
+          if (customerData) {
+            if (customerData.name && !customerName) {
+              setCustomerName(customerData.name);
+            }
+            setLoyaltyPoints(0);
+            setIsNewCustomer(false);
+          } else {
+            setIsNewCustomer(true);
+            setLoyaltyPoints(0);
+          }
+        }
       } catch (error) {
         console.error(error);
         setLoyaltyPoints(0);
+        setIsNewCustomer(false);
       }
     };
 
-    fetchLoyaltyPoints();
+    fetchCustomerDetails();
   }, [customerPhone]);
 
 
@@ -446,6 +476,11 @@ if (billingSettings?.mode === "inclusive" && billingSettings?.inclusiveBillType 
   const handleCheckout = async () => {
     if (cartItems.length === 0) {
       toast.error("Cart is empty");
+      return;
+    }
+
+    if (!customerName || !customerPhone) {
+      toast.error("Please enter customer name and phone number");
       return;
     }
 
@@ -1218,11 +1253,24 @@ doc.text(gstNote, centerX, currentY, { align: "center" });
     <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-accent/5 flex flex-col">
       <header className="border-b bg-card/80 backdrop-blur-sm sticky top-0 z-10">
         <div className="container mx-auto px-4 py-3 flex items-center justify-between gap-4 flex-wrap">
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-4 flex-wrap">
             <Button variant="ghost" size="icon" onClick={() => navigate("/dashboard")}>
               <ArrowLeft className="h-5 w-5" />
             </Button>
             <h1 className="text-xl sm:text-2xl font-bold">Modern Billing</h1>
+            
+            {/* Bill Settings Indicator */}
+            {billingSettings && (
+              <div className="flex items-center gap-2">
+                <div className="px-3 py-1.5 rounded-md bg-primary/10 border border-primary/20">
+                  <span className="text-xs font-medium text-primary">
+                    {billingSettings.mode === "inclusive" 
+                      ? `Inclusive - ${billingSettings.inclusiveBillType === "mrp" ? "MRP" : "Split"}`
+                      : "Exclusive"}
+                  </span>
+                </div>
+              </div>
+            )}
           </div>
           <div className="w-48">
             <select
@@ -1361,28 +1409,39 @@ doc.text(gstNote, centerX, currentY, { align: "center" });
           <div className="w-full lg:w-96 border-t lg:border-t-0 lg:border-l bg-card h-auto lg:h-[calc(100vh-60px)] max-h-[60vh] lg:max-h-none overflow-y-auto">
             <div className="p-2 sm:p-3 md:p-4 space-y-2 sm:space-y-3 md:space-y-4">
               <div className="space-y-1 sm:space-y-2">
-                <Label htmlFor="customer-name" className="text-xs sm:text-sm">Customer Name</Label>
+                <Label htmlFor="customer-name" className="text-xs sm:text-sm">
+                  Customer Name<span className="text-destructive ml-1">*</span>
+                </Label>
                 <Input
                   id="customer-name"
                   value={customerName}
                   onChange={(e) => setCustomerName(e.target.value)}
-                  placeholder="Optional"
+                  placeholder="Enter customer name"
                   className="h-9 sm:h-10 text-xs sm:text-sm"
+                  required
                 />
               </div>
 
               <div className="space-y-1 sm:space-y-2">
-                <Label htmlFor="customer-phone" className="text-xs sm:text-sm">Customer Phone</Label>
+                <Label htmlFor="customer-phone" className="text-xs sm:text-sm">
+                  Customer Phone<span className="text-destructive ml-1">*</span>
+                </Label>
                 <Input
                   id="customer-phone"
                   value={customerPhone}
                   onChange={(e) => setCustomerPhone(e.target.value)}
-                  placeholder="Optional"
+                  placeholder="Enter phone number"
                   className="h-9 sm:h-10 text-xs sm:text-sm"
+                  required
                 />
+                {isNewCustomer && customerPhone.length >= 10 && (
+                  <p className="text-xs text-blue-600 font-medium">
+                    New Customer
+                  </p>
+                )}
                 {loyaltyPoints > 0 && (
-                  <p className="text-xs text-muted-foreground">
-                    Available Points: {loyaltyPoints}
+                  <p className="text-xs text-green-600 font-medium">
+                    Points: {loyaltyPoints}
                   </p>
                 )}
               </div>

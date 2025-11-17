@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { formatIndianNumber } from "@/lib/numberFormat";
 import { setCounterSession, getCounterSession } from "@/lib/counterSession";
+import { ShareDialog } from "@/components/ShareDialog";
 
 const ManualBilling = () => {
   const navigate = useNavigate();
@@ -34,6 +35,8 @@ const ManualBilling = () => {
   const [activeTemplate, setActiveTemplate] = useState<any>(null);
   const [intraStateTrade, setIntraStateTrade] = useState<boolean>(false);
   const [billingSettings, setBillingSettings] = useState<any>(null);
+  const [showShareDialog, setShowShareDialog] = useState(false);
+  const [lastInvoiceData, setLastInvoiceData] = useState<{billNumber: string; total: number} | null>(null);
 
   // Initialize counter session
   useEffect(() => {
@@ -602,6 +605,11 @@ const ManualBilling = () => {
       }
 
       toast.success("Invoice generated successfully!");
+      
+      // Show share dialog
+      setLastInvoiceData({ billNumber, total });
+      setShowShareDialog(true);
+      
       setCartItems([]);
       setCustomerName("");
       setCustomerPhone("");
@@ -1484,6 +1492,14 @@ const ManualBilling = () => {
           </div>
         </div>
       </main>
+      
+      <ShareDialog
+        open={showShareDialog}
+        onOpenChange={setShowShareDialog}
+        billNumber={lastInvoiceData?.billNumber || ""}
+        customerPhone={customerPhone}
+        total={lastInvoiceData?.total || 0}
+      />
     </div>
   );
 };

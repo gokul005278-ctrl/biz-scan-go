@@ -6,9 +6,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArrowLeft, TrendingUp, DollarSign, Package, Users, Calendar, BarChart3, Target, Award, Activity, ShoppingBag, Percent, Clock } from "lucide-react";
 import { toast } from "sonner";
 import { BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { format, startOfDay, endOfDay, subDays, subMonths, startOfMonth, endOfMonth } from 'date-fns';
+import { format, startOfDay, endOfDay, subDays, subMonths, startOfMonth, endOfMonth, parseISO } from 'date-fns';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar as CalendarIcon } from "@/components/ui/calendar";
 
 interface TopProduct {
   id: string;
@@ -36,6 +38,8 @@ const AdvancedReports = () => {
   const [timeRange, setTimeRange] = useState<string>("7d");
   const [selectedCounter, setSelectedCounter] = useState<string>("all");
   const [counters, setCounters] = useState<any[]>([]);
+  const [customStartDate, setCustomStartDate] = useState<Date | undefined>(undefined);
+  const [customEndDate, setCustomEndDate] = useState<Date | undefined>(undefined);
   
   // Key Metrics
   const [metrics, setMetrics] = useState({
@@ -90,25 +94,34 @@ const AdvancedReports = () => {
     let start: Date;
     let end: Date = endOfDay(now);
 
-    switch (timeRange) {
-      case "7d":
-        start = startOfDay(subDays(now, 6));
-        break;
-      case "30d":
-        start = startOfDay(subDays(now, 29));
-        break;
-      case "90d":
-        start = startOfDay(subDays(now, 89));
-        break;
-      case "month":
-        start = startOfMonth(now);
-        end = endOfMonth(now);
-        break;
-      case "all":
-        start = new Date(0); // Beginning of time
-        break;
-      default:
-        start = startOfDay(subDays(now, 6));
+    if (timeRange === "custom" && customStartDate && customEndDate) {
+      start = startOfDay(customStartDate);
+      end = endOfDay(customEndDate);
+    } else {
+      switch (timeRange) {
+        case "today":
+          start = startOfDay(now);
+          end = endOfDay(now);
+          break;
+        case "7d":
+          start = startOfDay(subDays(now, 6));
+          break;
+        case "30d":
+          start = startOfDay(subDays(now, 29));
+          break;
+        case "90d":
+          start = startOfDay(subDays(now, 89));
+          break;
+        case "month":
+          start = startOfMonth(now);
+          end = endOfMonth(now);
+          break;
+        case "all":
+          start = new Date(0); // Beginning of time
+          break;
+        default:
+          start = startOfDay(subDays(now, 6));
+      }
     }
 
     return { start, end };
@@ -390,19 +403,73 @@ const AdvancedReports = () => {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                 <label className="text-sm font-medium mb-2 block">Time Range</label>
-                <Select value={timeRange} onValueChange={setTimeRange}>
+                <Select value={timeRange} onValueChange={(value) => {
+                  setTimeRange(value);
+                  if (value !== "custom") {
+                    setCustomStartDate(undefined);
+                    setCustomEndDate(undefined);
+                  }
+                }}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="today">Today</SelectItem>
                     <SelectItem value="7d">Last 7 Days</SelectItem>
                     <SelectItem value="30d">Last 30 Days</SelectItem>
                     <SelectItem value="90d">Last 90 Days</SelectItem>
                     <SelectItem value="month">This Month</SelectItem>
+                    <SelectItem value="custom">Custom Range</SelectItem>
                     <SelectItem value="all">All Time</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
+              
+              {timeRange === "custom" && (
+                <>
+                  <div>
+                    <label className="text-sm font-medium mb-2 block">Start Date</label>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button variant="outline" className="w-full justify-start text-left font-normal">
+                          <Calendar className="mr-2 h-4 w-4" />
+                          {customStartDate ? format(customStartDate, "PPP") : "Pick a date"}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <CalendarIcon
+                          mode="single"
+                          selected={customStartDate}
+                          onSelect={setCustomStartDate}
+                          initialFocus
+                          className="pointer-events-auto"
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium mb-2 block">End Date</label>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button variant="outline" className="w-full justify-start text-left font-normal">
+                          <Calendar className="mr-2 h-4 w-4" />
+                          {customEndDate ? format(customEndDate, "PPP") : "Pick a date"}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <CalendarIcon
+                          mode="single"
+                          selected={customEndDate}
+                          onSelect={setCustomEndDate}
+                          initialFocus
+                          className="pointer-events-auto"
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                </>
+              )}
+              
               <div>
                 <label className="text-sm font-medium mb-2 block">Counter</label>
                 <Select value={selectedCounter} onValueChange={setSelectedCounter}>
@@ -420,7 +487,7 @@ const AdvancedReports = () => {
                 </Select>
               </div>
               <div className="flex items-end">
-                <Button onClick={fetchAdvancedData} className="w-full">
+                <Button onClick={fetchAdvancedData} className="w-full" disabled={timeRange === "custom" && (!customStartDate || !customEndDate)}>
                   <Activity className="mr-2 h-4 w-4" />
                   Refresh Data
                 </Button>
