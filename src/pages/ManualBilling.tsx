@@ -37,6 +37,7 @@ const ManualBilling = () => {
   const [billingSettings, setBillingSettings] = useState<any>(null);
   const [showShareDialog, setShowShareDialog] = useState(false);
   const [lastInvoiceData, setLastInvoiceData] = useState<{billNumber: string; total: number} | null>(null);
+  const [lastPdfDataUrl, setLastPdfDataUrl] = useState<string | null>(null);
 
   // Initialize counter session
   useEffect(() => {
@@ -500,11 +501,14 @@ const ManualBilling = () => {
     const requiredHeight = Math.ceil(headerHeight + itemsHeight + totalsHeight + footerHeight + 15); // Added extra 15mm safety margin
     
     // Generate PDF based on selected format
+    let pdfUrl = '';
     if (invoiceFormat === 'a4') {
-      generateA4Invoice(billNumber, subtotal, productSGST, productCGST, productIGST, couponDiscount, additionalSGST, additionalCGST, totalSGST, totalCGST, totalIGST, taxAmount, total, billingSettings?.inclusiveBillType);
+      pdfUrl = generateA4Invoice(billNumber, subtotal, productSGST, productCGST, productIGST, couponDiscount, additionalSGST, additionalCGST, totalSGST, totalCGST, totalIGST, taxAmount, total, billingSettings?.inclusiveBillType);
     } else {
-      generateThermalInvoice(billNumber, subtotal, productSGST, productCGST, productIGST, couponDiscount, additionalSGST, additionalCGST, additionalGstAmount, taxAmount, total, requiredHeight, billingSettings?.inclusiveBillType);
+      pdfUrl = generateThermalInvoice(billNumber, subtotal, productSGST, productCGST, productIGST, couponDiscount, additionalSGST, additionalCGST, additionalGstAmount, taxAmount, total, requiredHeight, billingSettings?.inclusiveBillType);
     }
+
+    setLastPdfDataUrl(pdfUrl);
 
     // Save customer and invoice, and reduce stock
     try {
@@ -871,7 +875,9 @@ const ManualBilling = () => {
       currentY += 5; // Add extra padding
     }
     
+    const dataUrl = doc.output('datauristring');
     doc.save(`${billNumber}.pdf`);
+    return dataUrl;
   };
 
   const generateA4Invoice = (
@@ -1206,7 +1212,9 @@ const ManualBilling = () => {
     doc.setLineWidth(1);
     doc.line(leftMargin, 280, rightMargin, 280);
     
+    const dataUrl = doc.output('datauristring');
     doc.save(`${billNumber}.pdf`);
+    return dataUrl;
   };
 
   return (
@@ -1499,6 +1507,7 @@ const ManualBilling = () => {
         billNumber={lastInvoiceData?.billNumber || ""}
         customerPhone={customerPhone}
         total={lastInvoiceData?.total || 0}
+        pdfDataUrl={lastPdfDataUrl || undefined}
       />
     </div>
   );
