@@ -41,6 +41,7 @@ const ModernBilling = () => {
   const [billingSettings, setBillingSettings] = useState<any>(null);
   const [showShareDialog, setShowShareDialog] = useState(false);
   const [lastInvoiceData, setLastInvoiceData] = useState<{billNumber: string; total: number} | null>(null);
+  const [lastPdfDataUrl, setLastPdfDataUrl] = useState<string | null>(null);
 
 
 
@@ -904,7 +905,9 @@ doc.text(gstNote, centerX, currentY, { align: "center" });
     const thankYouNote = companyProfile?.thank_you_note || "Thank you for your business!";
     doc.text(thankYouNote, centerX, currentY, { align: "center" });
     
+    const dataUrl = doc.output('datauristring');
     doc.save(`${billNumber}.pdf`);
+    return dataUrl;
   };
 
   const generateA4Invoice = (
@@ -922,7 +925,7 @@ doc.text(gstNote, centerX, currentY, { align: "center" });
   taxAmount: number,
   total: number,
   inclusiveBillType: "split" | "mrp"
-) => {
+): string => {
     const doc = new jsPDF({
       unit: 'mm',
       format: 'a4',
@@ -1140,9 +1143,8 @@ doc.text(gstNote, centerX, currentY, { align: "center" });
     doc.text("Subtotal:", totalsStartX, currentY);
     doc.text(formatIndianNumber(subtotal, 2), rightMargin - 2, currentY, { align: "right" });
     currentY += 6;
-    if (billingSettings?.mode === "inclusive" &&
-    billingSettings?.inclusiveBillType === "split")
-     {
+    if (!(billingSettings?.mode === "inclusive" &&
+    billingSettings?.inclusiveBillType === "mrp")) {
     if (intraStateTrade) {
       if (productIGST > 0) {
         doc.text("IGST (Product):", totalsStartX, currentY);
@@ -1154,7 +1156,6 @@ doc.text(gstNote, centerX, currentY, { align: "center" });
         doc.text("SGST (Product):", totalsStartX, currentY);
         doc.text(formatIndianNumber(productSGST, 2), rightMargin - 2, currentY, { align: "right" });
         currentY += 6;
-        
         doc.text("CGST (Product):", totalsStartX, currentY);
         doc.text(formatIndianNumber(productCGST, 2), rightMargin - 2, currentY, { align: "right" });
         currentY += 6;
@@ -1244,7 +1245,9 @@ doc.text(gstNote, centerX, currentY, { align: "center" });
     doc.setLineWidth(1);
     doc.line(leftMargin, 280, rightMargin, 280);
     
+    const dataUrl = doc.output('datauristring');
     doc.save(`${billNumber}.pdf`);
+    return dataUrl;
   };
 
   const totals = calculateTotals();
@@ -1622,6 +1625,7 @@ doc.text(gstNote, centerX, currentY, { align: "center" });
         billNumber={lastInvoiceData?.billNumber || ""}
         customerPhone={customerPhone}
         total={lastInvoiceData?.total || 0}
+        pdfDataUrl={lastPdfDataUrl || undefined}
       />
     </div>
   );

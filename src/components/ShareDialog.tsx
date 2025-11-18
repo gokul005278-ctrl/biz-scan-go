@@ -9,6 +9,7 @@ interface ShareDialogProps {
   billNumber: string;
   customerPhone: string;
   total: number;
+  pdfDataUrl?: string;
 }
 
 export const ShareDialog = ({ 
@@ -16,7 +17,8 @@ export const ShareDialog = ({
   onOpenChange, 
   billNumber, 
   customerPhone,
-  total 
+  total,
+  pdfDataUrl
 }: ShareDialogProps) => {
   
   const handleWhatsApp = () => {
@@ -33,17 +35,49 @@ export const ShareDialog = ({
     onOpenChange(false);
   };
 
-  const handleGmail = () => {
+  const handleGmail = async () => {
     const subject = encodeURIComponent(`Invoice ${billNumber}`);
-    const body = encodeURIComponent(
-      `Dear Customer,\n\nPlease find your invoice details below:\n\nInvoice Number: ${billNumber}\nTotal Amount: ₹${total.toFixed(2)}\n\nThank you for your business!`
-    );
-    window.open(`https://mail.google.com/mail/?view=cm&fs=1&su=${subject}&body=${body}`, '_blank');
-    onOpenChange(false);
+    const bodyText = `Dear Customer,\n\nPlease find your invoice details below:\n\nInvoice Number: ${billNumber}\nTotal Amount: ₹${total.toFixed(2)}\n\nThank you for your business!`;
+
+    if (!pdfDataUrl) {
+      // Fallback: open Gmail compose (cannot auto-attach via URL)
+      const body = encodeURIComponent(bodyText);
+      window.open(`https://mail.google.com/mail/?view=cm&fs=1&su=${subject}&body=${body}`, '_blank');
+      onOpenChange(false);
+      return;
+    }
+
+    const to = window.prompt('Enter recipient email');
+    if (!to) return;
+
+    try {
+      const base64 = pdfDataUrl.includes(',') ? pdfDataUrl.split(',')[1] : pdfDataUrl;
+      const resp = await fetch(`https://dcfwnbezcieqpcenwfbp.functions.supabase.co/send-invoice`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          to,
+          subject: `Invoice ${billNumber}`,
+          body: bodyText,
+          filename: `${billNumber}.pdf`,
+          pdfBase64: base64,
+        })
+      });
+      if (!resp.ok) throw new Error('Failed to send email');
+      toast.success('Email sent with PDF attached');
+      onOpenChange(false);
+    } catch (e: any) {
+      console.error(e);
+      toast.error(e.message || 'Failed to send email');
+    }
   };
 
   const handlePrint = () => {
-    window.print();
+    if (pdfDataUrl) {
+      window.open(pdfDataUrl, '_blank');
+    } else {
+      window.print();
+    }
     onOpenChange(false);
   };
 
